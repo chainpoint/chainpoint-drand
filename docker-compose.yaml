@@ -1,0 +1,47 @@
+version: '3.7'
+
+services:
+
+  drand:
+    image: drandorg/go-drand:latest
+    volumes:
+      - ./data:/data/drand/.drand
+    labels:
+      - "traefik.enable=true"
+      - "traefik.protocol=h2c"
+      - "traefik.basic.frontend.rule=Host:drand-a.chainpoint.org,drand-1.chainpoint.org"
+      - "traefik.basic.port=8080"
+    entrypoint: /usr/local/bin/entrypoint.sh
+    command: start --verbose --tls-disable --private-listen 0.0.0.0:8080
+    restart: always
+
+  traefik:
+    image: traefik:v1.7.16
+    command:
+      - --debug=true
+      - --logLevel=DEBUG
+      - --defaultentrypoints=https,http
+      - --entryPoints=Name:http Address::80 Redirect.EntryPoint:https
+      - --entryPoints=Name:https Address::8080 TLS
+      - --retry
+      - --docker.endpoint=unix:///var/run/docker.sock
+      - --docker.domain=chainpoint.org
+      - --docker.watch=true
+      - --docker.exposedbydefault=false
+      - --acme.email=jacob@tierion.com
+      - --acme.storage=acme.json
+      - --acme.entryPoint=https
+      - --acme.onHostRule=true
+      - --acme.httpchallenge.entrypoint=http
+    ports:
+      - target: 80
+        published: 80
+        protocol: tcp
+        mode: host
+      - target: 8080
+        published: 8080
+        protocol: tcp
+        mode: host
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./acme.json:/acme.json
